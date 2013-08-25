@@ -10,10 +10,13 @@ include_directories("${SFML_INCLUDE_DIR}")
 
 add_executable(MultiPaintClient
 	client/main.cpp
+	client/const.hpp
+	common/const.hpp
 	)
 target_link_libraries(MultiPaintClient ${SFML_LIBRARIES})
 
 add_executable(MultiPaintServer
 	server/main.cpp
+	common/const.hpp
 	)
 target_link_libraries(MultiPaintServer ${SFML_SYSTEM_LIBRARY} ${SFML_NETWORK_LIBRARY})
