@@ -1,0 +1,15 @@
+cmake_minimum_required(VERSION 2.6)
+
+project(MultiPaint)
+
+# add SFML finding module
+set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/CMakeModules" ${CMAKE_MODULE_PATH})
+
+find_package(SFML 2 REQUIRED system window graphics network)
+include_directories("${SFML_INCLUDE_DIR}")
+
+add_executable(MultiPaint
+	source/main.cpp
+	)
+
+target_link_libraries(MultiPaint ${SFML_LIBRARIES})
