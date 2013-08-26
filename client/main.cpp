@@ -1,10 +1,12 @@
 #include <SFML/Graphics.hpp>
 #include <SFML/Network.hpp>
+#include <SFML/System.hpp>
 
 #include <string>
 #include <iostream>
 #include <algorithm>
 #include <cstdlib>
+#include <sstream>
 
 #include "../common/const.hpp"
 #include "const.hpp"
@@ -17,8 +19,25 @@ enum GameState
 
 bool setup( int argc, char** argv, sf::TcpSocket& out_socket, std::string& out_error )
 {
-  // TODO
   return true;
+  std::string serverStr = "mrwonko.dyndns.org";
+  if( argc > 1 )
+  {
+    serverStr = argv[1];
+  }
+  unsigned short port;
+  if( argc > 2 )
+  {
+    std::stringstream ss;
+    ss << argv[2];
+    ss >> port;
+  }
+  else
+  {
+    port = 14792;
+  }
+  sf::Socket::Status status = out_socket.connect( sf::IpAddress( serverStr ), port, sf::seconds(5.f) );
+  return status == sf::Socket::Done;
 }
 
 void drawLine( sf::Image& image, sf::Vector2i p1, sf::Vector2i p2, const sf::Color& color )
@@ -30,10 +49,10 @@ void drawLine( sf::Image& image, sf::Vector2i p1, sf::Vector2i p2, const sf::Col
     sf::Vector2i& start = p1.x < p2.x ? p1 : p2;
     sf::Vector2i& end = p1.x < p2.x ? p2 : p1;
     int endX = std::min( end.x, (int)image.getSize().x - 1 );
-    for( int x = start.x; x <= endX; ++x )
+    for( int x = std::max( start.x, 0 ); x <= endX; ++x )
     {
       int y = (int)(start.y + (float) (x - start.x) * ( end.y - start.y ) / diffX + 0.5f);
-      if( y >= 0 && y < image.getSize().y )
+      if( y >= 0 && y < (int)image.getSize().y )
       {
         image.setPixel( x, y, color );
       }
@@ -47,22 +66,10 @@ void drawLine( sf::Image& image, sf::Vector2i p1, sf::Vector2i p2, const sf::Col
     for( int y = std::max(start.y, 0); y <= endY; ++y )
     {
       int x = (int)(start.x + (float) (y - start.y) * ( end.x - start.x ) / diffY + 0.5f);
-      if( x >= 0 && x < image.getSize().x )
+      if( x >= 0 && x < (int)image.getSize().x )
       {
         image.setPixel( x, y, color );
       }
-    }
-  }
-}
-
-void handleWindowEvents( sf::Window& wnd, const GameState gameState )
-{
-  sf::Event ev;
-  while(wnd.pollEvent(ev))
-  {
-    if(ev.type == sf::Event::Closed)
-    {
-      wnd.close();
     }
   }
 }
@@ -88,38 +95,96 @@ int main( int argc, char** argv )
     sf::ContextSettings(0, 0, 0, 2, 0)
     );
 
-  GameState gameState = GSAwaitingTurn;
 
   static const sf::Color backgroundColor( 63, 63, 63 );
 
   sf::Image img;
   img.create( 480, 320 );
-  drawLine(img, sf::Vector2i(20, 20), sf::Vector2i(30, 25), sf::Color::White);
-  drawLine(img, sf::Vector2i(20, 20), sf::Vector2i(25, 30), sf::Color::Green);
-  drawLine(img, sf::Vector2i(40, 40), sf::Vector2i(35, 30), sf::Color::Blue);
-  drawLine(img, sf::Vector2i(40, 40), sf::Vector2i(30, 35), sf::Color::Yellow);
-  drawLine(img, sf::Vector2i(40, 40), sf::Vector2i(50, 35), sf::Color::Red);
-  drawLine(img, sf::Vector2i(40, 40), sf::Vector2i(45, 30), sf::Color::Magenta);
-  
-  drawLine(img, sf::Vector2i(200, 100), sf::Vector2i(400, 200), sf::Color::White);
-  drawLine(img, sf::Vector2i(400, 200), sf::Vector2i(300, 400), sf::Color::White);
-  drawLine(img, sf::Vector2i(300, 400), sf::Vector2i(100, 300), sf::Color::White);
-  drawLine(img, sf::Vector2i(100, 300), sf::Vector2i(200, 100), sf::Color::White);
-
+  GameState gameState = GSAwaitingTurn;
   sf::Texture tex;
   tex.loadFromImage(img);
   sf::Sprite sprite(tex);
-  sprite.setPosition(80, 80);
+  sprite.setPosition(OFS_X, OFS_Y);
+  sf::Clock roundClock;
+
+  // I do to much Lua... local function handleWindowEvents()
+  struct
+  {
+    sf::Window& wnd;
+    GameState &gameState;
+    sf::Texture &tex;
+    sf::Image &img;
+
+    sf::Vector2i lastMousePos;
+    bool useWhite;
+
+    void operator()()
+    {
+      static const sf::Vector2i offset( OFS_X, OFS_Y );
+
+      sf::Event ev;
+      bool painted = false;
+      while( wnd.pollEvent( ev ) )
+      {
+        if( ev.type == sf::Event::Closed || ( ev.type == sf::Event::KeyPressed && ev.key.code == sf::Keyboard::Escape ) )
+        {
+          wnd.close();
+        }
+        else if( ev.type == sf::Event::MouseMoved )
+        {
+          sf::Vector2i mousePos( ev.mouseMove.x, ev.mouseMove.y );
+          if( lastMousePos.x != -1 && gameState == GSDrawing )
+          {
+            drawLine( img, lastMousePos - offset, mousePos - offset, useWhite ? sf::Color::White : sf::Color::Black );
+            painted = true;
+            lastMousePos = mousePos;
+          }
+        }
+        else if( ev.type == sf::Event::MouseButtonPressed && ev.mouseButton.button == sf::Mouse::Left )
+        {
+          lastMousePos.x = ev.mouseButton.x;
+          lastMousePos.y = ev.mouseButton.y;
+          if( gameState == GSDrawing )
+          {
+            drawLine( img, lastMousePos - offset, lastMousePos - offset, useWhite ? sf::Color::White : sf::Color::Black );
+            painted = true;
+          }
+        }
+        else if( ev.type == sf::Event::MouseButtonReleased && ev.mouseButton.button == sf::Mouse::Left )
+        {
+          if( lastMousePos.x != -1 && gameState == GSDrawing )
+          {
+            sf::Vector2i mousePos( ev.mouseButton.x, ev.mouseButton.y );
+            drawLine( img, lastMousePos - offset, mousePos - offset, useWhite ? sf::Color::White : sf::Color::Black );
+            painted = true;
+          }
+          lastMousePos.x = lastMousePos.y = -1;
+        }
+        else if( ev.type == sf::Event::KeyPressed || ev.type == sf::Event::MouseButtonPressed )
+        {
+          useWhite = !useWhite;
+        }
+      }
+      if( painted )
+      {
+        tex.loadFromImage( img );
+      }
+    }
+  } handleWindowEvents = { wnd, gameState, tex, img, sf::Vector2i( -1, -1 ), true };
+
+  // TODO REMOVE
+  gameState = GSDrawing;
 
   // Main loop
   while( wnd.isOpen() )
   {
-    handleWindowEvents( wnd, gameState );
+    handleWindowEvents();
 
     wnd.clear( backgroundColor );
     wnd.draw( sprite );
     wnd.display();
   }
+  // TODO: Send BYE
 
   return 0;
 }

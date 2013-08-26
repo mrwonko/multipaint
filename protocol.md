@@ -1,6 +1,6 @@
 # MultiPaint Network Protocol
 
-All done via TCP, port unspecified (use whatever).
+All done via TCP, port 14792 by default.
 
 ## Current Version
 

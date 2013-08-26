@@ -6,4 +6,7 @@
 
 #define WINDOW_TITLE "MultiPaint"
 
+#define OFS_X 80
+#define OFS_Y 80
+
 #endif
