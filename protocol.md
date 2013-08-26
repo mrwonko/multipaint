@@ -8,51 +8,49 @@ All done via TCP, port 14792 by default.
 
 ## Messages
 
-Always preceded with "MRW MULTIPAINT" followed by a 32 bit integer version number in ASCII. Then the actual message.
-
 Strings consist of first their length in 32 bit, then the Characters without Null-termination.
 
-### HELLO
+### "HELLO MRWONKO MULTIPAINT"<32 bit version>
 
 Used by client on connection to verify compatibility
 
-### WELCOME
+### "WELCOME"
 
 Used by server on connection to accept a client (correct version)
 
-### SORRY
+### "SORRY"
 
 Used by server to reject a client (wrong version, incorrect protocol) before closing connection
 
-### QUEUE\n<uint>
+### "QUEUE"<uint>
 
 Server notifying client of queue length change (happens every turn and when somebody leaves)
 
-### NEWTURN\n<binary image data>
+### "SYNC"<turn time left (float)><binary image data>
 
-Server notifying client of start of (someone's) turn to sync the turn countdown (happens every turn) and the image
+Synchronization of Image and turn-time from server to client.
 
-### GO
+### "GO"
 
 Server notifying client of start of his turn, he has 5 seconds to respond
 
-### GOING
+### "GOING"
 
 Client notifying server of having started the turn. He now has 15 seconds to turn in the result.
 
-### DONE\n<binary image data>
+### "DONE"<binary image data>
 
 Client notifying server of being done editing
 
-### ACCEPTED
+### "ACCEPTED"
 
 Server notifying client that the image was accepted
 
-### SLACKER
+### "SLACKER"
 
 Server notifying client that he took to long and need not bother anymore
 
-### BYE
+### "BYE"
 
 Client/server signing off before closing the connection
 

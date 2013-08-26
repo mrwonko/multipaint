@@ -19,7 +19,6 @@ enum GameState
 
 bool setup( int argc, char** argv, sf::TcpSocket& out_socket, std::string& out_error )
 {
-  return true;
   std::string serverStr = "mrwonko.dyndns.org";
   if( argc > 1 )
   {

@@ -1,4 +1,4 @@
-#include "bitmap.hpp"
+#include "../common/bitmap.hpp"
 
 #include <SFML/Graphics/Image.hpp>
 
@@ -17,7 +17,7 @@ void Bitmap::toImage(sf::Image& image)
   }
 }
 
-const bool Bitmap::fromImage(sf::Image& image)
+const bool Bitmap::fromImage(sf::Image& image) const
 {
   if( image.getSize() != sf::Vector2u(IMAGE_WIDTH, IMAGE_HEIGHT ) )
   {

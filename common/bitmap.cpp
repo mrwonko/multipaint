@@ -9,24 +9,24 @@ Bitmap::Bitmap()
   memset(m_data[0], 0, sizeof(m_data));
 }
 
-const bool Bitmap::fromPacket(sf::Packet& packet)
+sf::Packet& operator>>( sf::Packet& packet, Bitmap& bitmap )
 {
-
   std::string data;
   packet >> data;
-  if( !packet || data.size() != sizeof(m_data) )
+  if( packet && data.size() == sizeof(bitmap.m_data) )
   {
-    return false;
+    memcpy(bitmap.m_data[0], data.c_str(), data.size());
   }
   else
   {
-    memcpy(m_data[0], data.c_str(), data.size());
-    return true;
+    // No way to signal failure?
   }
+  return packet;
 }
 
-void Bitmap::toPacket(sf::Packet& packet)
+sf::Packet& operator<<( sf::Packet& packet, const Bitmap& bitmap )
 {
-  std::string data( m_data[0], sizeof(m_data) );
-  packet << data;
+  std::string data( bitmap.m_data[0], sizeof(bitmap.m_data) );
+  return packet << data;
 }
+
