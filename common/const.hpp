@@ -4,4 +4,7 @@
 #define IMAGE_WIDTH 480
 #define IMAGE_HEIGHT 320
 
+#define PROTOCOL_VERSION 1
+#define PROTOCOL_NAME "MRW MULTIPAINT"
+
 #endif

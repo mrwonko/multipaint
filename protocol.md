@@ -8,7 +8,9 @@ All done via TCP, port unspecified (use whatever).
 
 ## Messages
 
-Always preceded with "MRW MULTIPAINT\n" followed by integer version number in ASCII and another \n. Then the actual message.
+Always preceded with "MRW MULTIPAINT" followed by a 32 bit integer version number in ASCII. Then the actual message.
+
+Strings consist of first their length in 32 bit, then the Characters without Null-termination.
 
 ### HELLO
 
@@ -57,3 +59,5 @@ Client/server signing off before closing the connection
 ## Binary Image Data
 
 This is identical to the image data in the netpbm format - the image left to right, top to bottom, 1 bit per color, most significant bit being left. Resolution is 480*320, resulting in 19200 bytes.
+
+It's sent as a string and as such prefixed with its size, 19200, as a 32 bit integer.
