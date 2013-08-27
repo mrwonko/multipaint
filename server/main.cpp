@@ -50,7 +50,10 @@ const bool startTurn( sf::TcpSocket& client )
 {
   sf::Packet packet;
   packet << NET_MESSAGE_START_TURN;
-  return packet && client.send( packet ) == sf::Socket::Done;
+  //std::cout << "senidng" << std::endl;
+  bool status = packet && client.send( packet ) == sf::Socket::Done; // client.send() never terminates. WHAT THE FUCK?!?
+  //std::cout << "snet" << std::endl;
+  return status;
 }
 
 const bool acceptClient( sf::TcpSocket& client )
@@ -139,6 +142,8 @@ int main(int argc, char** argv)
 
   while( !g_exit )
   {
+    std::cout << "Server loop entry!" << std::endl;
+
     float waitTime = 1.f; // How long to listen on sockets each tick - too long makes the server unresponsive (to SIGINT)
 
     if( ( state == SAwaitingResults && TURN_TIME + TURN_TIME_EXTRA - turnTime.getElapsedTime().asSeconds() < 0 ) 
@@ -199,6 +204,8 @@ int main(int argc, char** argv)
 
     if( selector.wait( sf::seconds( waitTime ) ) )
     {
+
+
       if( selector.isReady( listener ) )
       {
         sf::TcpSocket *client = new sf::TcpSocket;
@@ -216,6 +223,10 @@ int main(int argc, char** argv)
         }
         //listener.listen( port ); // is apparently still listening, this fails.
       }
+
+
+      bool modifiedPlayers = false;
+
       for( std::list< sf::TcpSocket* >::iterator it = newClients.begin(); it != newClients.end(); )
       {
         bool erased = false;
@@ -231,7 +242,7 @@ int main(int argc, char** argv)
           {
             client.disconnect();
             std::cout << "Disconnecting (1) " << client.getRemoteAddress().toString() << ":" << client.getRemotePort() << std::endl;
-            selector.remove( client );
+            selector.remove( **it );
             assert( &client == *it );
             delete *it;
             it = clients.erase( it );
@@ -278,12 +289,15 @@ int main(int argc, char** argv)
                     {
                       turnTime.restart();
                     }
+                    std::cout << "Syncing new client" << std::endl;
                     if( sync( client, bitmap, turnTime ) )
                     {
                       if( playingClients.empty() )
                       {
+                        std::cout << "New client is the first/only one, telling him to start." << std::endl;
                         if( !startTurn( client ) )
                         {
+                          std::cout << "Failed, dropping him." << std::endl;
                           client.disconnect();
                           std::cout << "Disconnecting (2) " << client.getRemoteAddress().toString() << ":" << client.getRemotePort() << std::endl;
                           selector.remove( client );
@@ -291,13 +305,16 @@ int main(int argc, char** argv)
                         }
                         else
                         {
+                          std::cout << "Putting new client into list of players." << std::endl;
                           state = SAwaitingTurnStartConfirmation;
                           playingClients.push_back( &client );
+                          modifiedPlayers = true;
                         }
                       }
                       else
                       {
                         playingClients.push_back( &client );
+                        modifiedPlayers = true;
                       }
                     }
                     else
@@ -316,6 +333,13 @@ int main(int argc, char** argv)
         {
           ++it;
         }
+      }
+
+      // I suppose this could lead to duplicate receive()? That would explain the hangs until I disconnect, thus causing a "BYE".
+      if( modifiedPlayers )
+      {
+        std::cout << "Postponing player check since a new one was added." << std::endl;
+        continue;
       }
 
       bool first = true;
