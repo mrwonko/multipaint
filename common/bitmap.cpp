@@ -10,7 +10,7 @@
 
 Bitmap::Bitmap()
 {
-  memset(m_data[0], 0, sizeof(m_data));
+  memset(m_data[0], 0xFF, sizeof(m_data));
 }
 
 void Bitmap::toImage(sf::Image& image) const
@@ -20,7 +20,7 @@ void Bitmap::toImage(sf::Image& image) const
   {
     for( unsigned int x = 0; x < IMAGE_WIDTH; ++x )
     {
-      if( m_data[y][x / 8] & (1 << (7 - x % 8) ) )
+      if( ! (m_data[y][x / 8] & (1 << (7 - x % 8) ) ) )
       {
         image.setPixel(x, y, sf::Color::White);
       }
@@ -41,7 +41,7 @@ const bool Bitmap::fromImage(sf::Image& image)
     {
       sf::Color& color = image.getPixel(x, y);
       const bool isBlack = ( color.r / 3 + color.g / 3 + color.b / 3 ) < 128;
-      if( !isBlack )
+      if( isBlack )
       {
         curChar |= 1 << ( 7 - x % 8 );
       }
