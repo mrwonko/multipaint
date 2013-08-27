@@ -338,6 +338,7 @@ int main( int argc, char** argv )
         return 0;
       }
       gameState = GSAwaitingTurn;
+      statusText.setString( STATUS_WAIT );
     }
 
     handleWindowEvents();
