@@ -103,9 +103,7 @@ void sendQueuePosition( std::list< sf::TcpSocket* >& clients )
   sf::Uint32 queuePosition = 0;
   for( std::list< sf::TcpSocket* >::iterator it = clients.begin(); it != clients.end(); ++it, ++queuePosition )
   {
-    sf::Packet packet;
-    packet << NET_MESSAGE_QUEUE_INFO << queuePosition;
-    (**it).send( packet );
+    sendQueueInfo( **it, queuePosition );
   }
 }
 
@@ -497,6 +495,7 @@ int main(int argc, char** argv)
                     // Find the next one who will answer, tell him to get busy
                     turnTime.restart();
                     syncAll( playingClients, bitmap, turnTime );
+                    sendQueuePosition( playingClients );
                     while( it != playingClients.end() )
                     {
                       sf::TcpSocket &client = **it;
