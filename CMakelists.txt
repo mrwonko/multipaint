@@ -11,7 +11,6 @@ include_directories("${SFML_INCLUDE_DIR}")
 add_executable(MultiPaintClient
 	client/main.cpp
 	client/const.hpp
-	client/bitmapToImage.cpp
 	common/const.hpp
 	common/bitmap.cpp
 	common/bitmap.hpp
@@ -25,4 +24,4 @@ add_executable(MultiPaintServer
 	common/bitmap.cpp
 	common/bitmap.hpp
 	)
-target_link_libraries(MultiPaintServer ${SFML_SYSTEM_LIBRARY} ${SFML_NETWORK_LIBRARY})
+target_link_libraries(MultiPaintServer ${SFML_SYSTEM_LIBRARY} ${SFML_NETWORK_LIBRARY} ${SFML_GRAPHICS_LIBRARY})

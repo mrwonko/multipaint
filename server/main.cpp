@@ -151,6 +151,8 @@ int main(int argc, char** argv)
   State state = SAwaitingClients;
   Bitmap bitmap;
 
+  bitmap.loadFromFile( BITMAP_FILENAME );
+
   while( !g_exit )
   {
     std::cout << "Server loop entry! State: " << (state == SAwaitingClients ? "Awaiting Clients" : ( state == SAwaitingResults ? "Awaiting Results" : "Awaiting Turn Start Confirmation" ) ) << std::endl;
@@ -485,6 +487,7 @@ int main(int argc, char** argv)
                   else
                   {
                     // Player handed in new Bitmap, is done now. Next one please.
+                    bitmap.saveToFile( BITMAP_FILENAME );
 
                     // Put him back to the end of the queue, remove from the front
                     playingClients.push_back( &client );

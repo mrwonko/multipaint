@@ -2,6 +2,7 @@
 #define COMMON_BITMAP_HPP_INCLUDED
 
 #include <climits>
+#include <string>
 
 #include "const.hpp"
 
@@ -19,6 +20,9 @@ public:
 
   const bool fromImage(sf::Image& image);
   void toImage(sf::Image& image) const;
+
+  const bool loadFromFile( const std::string& filename );
+  const bool saveToFile( const std::string& filename ) const;
 
 private:
   char m_data[ IMAGE_HEIGHT ][ IMAGE_WIDTH / CHAR_BIT + !!( IMAGE_WIDTH % CHAR_BIT ) ];
