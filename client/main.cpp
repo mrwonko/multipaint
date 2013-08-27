@@ -353,7 +353,7 @@ int main( int argc, char** argv )
     wnd.draw( sprite );
     wnd.display();
   }
-  // TODO: Send BYE
+  sendGoodbyes( server );
 
   return 0;
 }

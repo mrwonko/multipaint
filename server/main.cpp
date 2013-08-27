@@ -112,6 +112,7 @@ int main(int argc, char** argv)
   }
 
   sf::TcpListener listener;
+  //listener.setBlocking( false );
   listener.listen( port );
 
   std::list< sf::TcpSocket* > newClients; // not yet validated
@@ -150,7 +151,8 @@ int main(int argc, char** argv)
       notifySlacker( client );
       sendGoodbyes( client );
       client.disconnect();
-      std::cout << "Disconnecting " << client.getRemoteAddress().toString() << ":" << client.getRemotePort() << std::endl;
+      std::cout << "Disconnecting (6) " << client.getRemoteAddress().toString() << ":" << client.getRemotePort() << std::endl;
+      selector.remove( client );
       delete &client;
       playingClients.pop_front();
 
@@ -164,7 +166,8 @@ int main(int argc, char** argv)
         if( !startTurn( client ) )
         {
           client.disconnect();
-          std::cout << "Disconnecting " << client.getRemoteAddress().toString() << ":" << client.getRemotePort() << std::endl;
+          std::cout << "Disconnecting (7) " << client.getRemoteAddress().toString() << ":" << client.getRemotePort() << std::endl;
+          selector.remove( client );
           delete &client;
           playingClients.pop_front();
         }
@@ -179,7 +182,7 @@ int main(int argc, char** argv)
         state = SAwaitingClients;
       }
     }
-    else
+    else if( state != SAwaitingClients )
     {
       float timeToHandIn = waitTime;
       if( state == SAwaitingResults )
@@ -199,7 +202,7 @@ int main(int argc, char** argv)
       if( selector.isReady( listener ) )
       {
         sf::TcpSocket *client = new sf::TcpSocket;
-        client->setBlocking( false );
+        //client->setBlocking( false );
         if( listener.accept( *client ) == sf::Socket::Done )
         {
           newClients.push_back( client );
@@ -211,6 +214,7 @@ int main(int argc, char** argv)
         {
           delete client;
         }
+        //listener.listen( port ); // is apparently still listening, this fails.
       }
       for( std::list< sf::TcpSocket* >::iterator it = newClients.begin(); it != newClients.end(); )
       {
@@ -222,15 +226,18 @@ int main(int argc, char** argv)
           sf::TcpSocket &client;
           std::list< sf::TcpSocket* >::iterator& it;
           std::list< sf::TcpSocket* >& clients;
+          sf::SocketSelector& selector;
           void operator()()
           {
             client.disconnect();
-            std::cout << "Disconnecting " << client.getRemoteAddress().toString() << ":" << client.getRemotePort() << std::endl;
+            std::cout << "Disconnecting (1) " << client.getRemoteAddress().toString() << ":" << client.getRemotePort() << std::endl;
+            selector.remove( client );
+            assert( &client == *it );
             delete *it;
             it = clients.erase( it );
             erased = true;
           }
-        } dropClient = { erased, client, it, newClients };
+        } dropClient = { erased, client, it, newClients, selector };
 
         if( selector.isReady( client ) )
         {
@@ -278,7 +285,8 @@ int main(int argc, char** argv)
                         if( !startTurn( client ) )
                         {
                           client.disconnect();
-                          std::cout << "Disconnecting " << client.getRemoteAddress().toString() << ":" << client.getRemotePort() << std::endl;
+                          std::cout << "Disconnecting (2) " << client.getRemoteAddress().toString() << ":" << client.getRemotePort() << std::endl;
+                          selector.remove( client );
                           delete &client;
                         }
                         else
@@ -295,6 +303,7 @@ int main(int argc, char** argv)
                     else
                     {
                       std::cout << "Error synchronizing client " << client.getRemoteAddress().toString() << ":" << client.getRemotePort() << ", dropping." << std::endl;
+                      selector.remove( client );
                       delete &client;
                     }
                   }
@@ -324,10 +333,13 @@ int main(int argc, char** argv)
           const Bitmap& bitmap;
           sf::Clock& turnTime;
           bool& first;
+          sf::SocketSelector& selector;
           void operator()()
           {
             client.disconnect();
-            std::cout << "Disconnecting " << client.getRemoteAddress().toString() << ":" << client.getRemotePort() << std::endl;
+            std::cout << "Disconnecting (3) " << client.getRemoteAddress().toString() << ":" << client.getRemotePort() << std::endl;
+            selector.remove( **it );
+            assert( *it == &client );
             delete *it;
             it = clients.erase( it );
 
@@ -344,7 +356,8 @@ int main(int argc, char** argv)
                 {
                   // Couldn't send "start" message, probably disconnected or something.
                   client.disconnect();
-                  std::cout << "Disconnecting " << client.getRemoteAddress().toString() << ":" << client.getRemotePort() << std::endl;
+                  std::cout << "Disconnecting (4) " << client.getRemoteAddress().toString() << ":" << client.getRemotePort() << std::endl;
+                  selector.remove( client );
                   delete &client;
                   it = clients.erase( it );
                 }
@@ -364,17 +377,17 @@ int main(int argc, char** argv)
 
             erased = true;
           }
-        } dropClient = { erased, client, it, playingClients, state, bitmap, turnTime, first };
+        } dropClient = { erased, client, it, playingClients, state, bitmap, turnTime, first, selector };
 
         assert( state != SAwaitingClients ); // Because then there shouldn't be clients!
         
         if( selector.isReady( client ) )
         {
           sf::Packet packet;
-          if( client.receive(packet) != sf::Socket::Done )
+          if( client.receive( packet ) != sf::Socket::Done ) // FIXME For some reason this one fails?
           {
             // Could not receive packet
-            std::cout << "Dropping " << client.getRemoteAddress().toString() << ":" << client.getRemotePort() << std::endl;
+            std::cout << "Dropping " << client.getRemoteAddress().toString() << ":" << client.getRemotePort() << ", could not receive packet." << std::endl;
             sendGoodbyes( client );
             dropClient();
           }
@@ -432,7 +445,8 @@ int main(int argc, char** argv)
                       {
                         // Couldn't send "start" message, probably disconnected or something.
                         client.disconnect();
-                        std::cout << "Disconnecting " << client.getRemoteAddress().toString() << ":" << client.getRemotePort() << std::endl;
+                        std::cout << "Disconnecting (5) " << client.getRemoteAddress().toString() << ":" << client.getRemotePort() << std::endl;
+                        selector.remove( client );
                         delete &client;
                         it = playingClients.erase( it );
                       }
@@ -467,12 +481,14 @@ int main(int argc, char** argv)
   for( std::list< sf::TcpSocket* >::iterator it = newClients.begin(); it != newClients.end(); it = newClients.erase( it ) )
   {
     sendGoodbyes( **it );
+    selector.remove( **it );
     delete *it;
   }
 
   for( std::list< sf::TcpSocket* >::iterator it = playingClients.begin(); it != playingClients.end(); it = playingClients.erase(it) )
   {
     sendGoodbyes( **it );
+    selector.remove( **it );
     delete *it;
   }
 
