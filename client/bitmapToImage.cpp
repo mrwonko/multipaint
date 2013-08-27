@@ -2,7 +2,7 @@
 
 #include <SFML/Graphics/Image.hpp>
 
-void Bitmap::toImage(sf::Image& image)
+void Bitmap::toImage(sf::Image& image) const
 {
   image.create( IMAGE_WIDTH, IMAGE_HEIGHT );
   for( unsigned int y = 0; y < IMAGE_HEIGHT; ++y )
@@ -17,7 +17,7 @@ void Bitmap::toImage(sf::Image& image)
   }
 }
 
-const bool Bitmap::fromImage(sf::Image& image) const
+const bool Bitmap::fromImage(sf::Image& image)
 {
   if( image.getSize() != sf::Vector2u(IMAGE_WIDTH, IMAGE_HEIGHT ) )
   {

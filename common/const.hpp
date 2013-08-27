@@ -4,6 +4,8 @@
 #define IMAGE_WIDTH 480
 #define IMAGE_HEIGHT 320
 
+#define TURN_TIME 10.f // 10 seconds!
+
 #define NET_VERSION 1
 #define NET_MESSAGE_HELLO "HELLO MRWONKO MULTIPAINT" // sent by client, followed by UInt32 version
 #define NET_MESSAGE_REJECT_CLIENT "SORRY" // Server rejecting client

@@ -1,3 +1,8 @@
+/**
+  @file MultiPaint Server
+  @todo Inform clients about Queue position
+*/
+
 #include "../common/bitmap.hpp"
 #include "../common/const.hpp"
 #include "const.hpp"
@@ -21,8 +26,8 @@ static bool g_exit = false;
 
 void interruptHandler( int signal )
 {
-  g_exit = true;
   std::cout << "Request to terminate received, will shut down shortly." << std::endl;
+  g_exit = true;
 }
 
 const bool sync( sf::TcpSocket& client, const Bitmap& bitmap, const sf::Clock& turnTime )
@@ -145,10 +150,13 @@ int main(int argc, char** argv)
       notifySlacker( client );
       sendGoodbyes( client );
       client.disconnect();
+      std::cout << "Disconnecting " << client.getRemoteAddress().toString() << ":" << client.getRemotePort() << std::endl;
       delete &client;
       playingClients.pop_front();
 
       // Find the next one who will answer, tell him to get busy
+      turnTime.restart();
+      syncAll( playingClients, bitmap, turnTime );
       while( !playingClients.empty() )
       {
         sf::TcpSocket &client = *playingClients.front();
@@ -156,13 +164,12 @@ int main(int argc, char** argv)
         if( !startTurn( client ) )
         {
           client.disconnect();
+          std::cout << "Disconnecting " << client.getRemoteAddress().toString() << ":" << client.getRemotePort() << std::endl;
           delete &client;
           playingClients.pop_front();
         }
         else
         {
-          turnTime.restart();
-          syncAll( playingClients, bitmap, turnTime );
           break;
         }
       }
@@ -218,6 +225,7 @@ int main(int argc, char** argv)
           void operator()()
           {
             client.disconnect();
+            std::cout << "Disconnecting " << client.getRemoteAddress().toString() << ":" << client.getRemotePort() << std::endl;
             delete *it;
             it = clients.erase( it );
             erased = true;
@@ -259,7 +267,6 @@ int main(int argc, char** argv)
                     std::cout << "Client " << client.getRemoteAddress().toString() << ":" << client.getRemotePort() << " is valid, adding to queue." << std::endl;
                     it = newClients.erase( it );
                     erased = true;
-                    
                     if( playingClients.empty() )
                     {
                       turnTime.restart();
@@ -271,6 +278,7 @@ int main(int argc, char** argv)
                         if( !startTurn( client ) )
                         {
                           client.disconnect();
+                          std::cout << "Disconnecting " << client.getRemoteAddress().toString() << ":" << client.getRemotePort() << std::endl;
                           delete &client;
                         }
                         else
@@ -319,6 +327,7 @@ int main(int argc, char** argv)
           void operator()()
           {
             client.disconnect();
+            std::cout << "Disconnecting " << client.getRemoteAddress().toString() << ":" << client.getRemotePort() << std::endl;
             delete *it;
             it = clients.erase( it );
 
@@ -326,6 +335,8 @@ int main(int argc, char** argv)
             if( first )
             {
               // Find the next one who will answer, tell him to get busy
+              turnTime.restart();
+              syncAll( clients, bitmap, turnTime );
               while( it != clients.end() )
               {
                 sf::TcpSocket &client = **it;
@@ -333,6 +344,7 @@ int main(int argc, char** argv)
                 {
                   // Couldn't send "start" message, probably disconnected or something.
                   client.disconnect();
+                  std::cout << "Disconnecting " << client.getRemoteAddress().toString() << ":" << client.getRemotePort() << std::endl;
                   delete &client;
                   it = clients.erase( it );
                 }
@@ -340,8 +352,6 @@ int main(int argc, char** argv)
                 {
                   // Player is aware he's supposed to do stuff.
                   state = SAwaitingTurnStartConfirmation;
-                  turnTime.restart();
-                  syncAll( clients, bitmap, turnTime );
                   break;
                 }
               }
@@ -413,6 +423,8 @@ int main(int argc, char** argv)
                     erased = true;
 
                     // Find the next one who will answer, tell him to get busy
+                    turnTime.restart();
+                    syncAll( playingClients, bitmap, turnTime );
                     while( it != playingClients.end() )
                     {
                       sf::TcpSocket &client = **it;
@@ -420,6 +432,7 @@ int main(int argc, char** argv)
                       {
                         // Couldn't send "start" message, probably disconnected or something.
                         client.disconnect();
+                        std::cout << "Disconnecting " << client.getRemoteAddress().toString() << ":" << client.getRemotePort() << std::endl;
                         delete &client;
                         it = playingClients.erase( it );
                       }
@@ -427,8 +440,6 @@ int main(int argc, char** argv)
                       {
                         // Player is aware he's supposed to do stuff.
                         state = SAwaitingTurnStartConfirmation;
-                        turnTime.restart();
-                        syncAll( playingClients, bitmap, turnTime );
                         break;
                       }
                     }

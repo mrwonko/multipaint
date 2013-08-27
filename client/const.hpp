@@ -9,4 +9,10 @@
 #define OFS_X 80
 #define OFS_Y 80
 
+#define STATUS_WAIT "Awaiting turn..."
+#define STATUS_DRAW "Draw! You have 10 seconds!"
+
+//#define FONT_PATH "data/arial.ttf"
+#define FONT_PATH "data/Copyviol.ttf"
+
 #endif

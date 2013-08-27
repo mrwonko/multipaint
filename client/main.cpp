@@ -9,6 +9,7 @@
 #include <sstream>
 
 #include "../common/const.hpp"
+#include "../common/bitmap.hpp"
 #include "const.hpp"
 
 enum GameState
@@ -17,7 +18,35 @@ enum GameState
   GSDrawing
 };
 
-bool setup( int argc, char** argv, sf::TcpSocket& out_socket, std::string& out_error )
+bool sayHello( sf::TcpSocket& server )
+{
+  sf::Packet packet;
+  packet << NET_MESSAGE_HELLO << NET_VERSION;
+  return packet && server.send( packet ) == sf::Socket::Done;
+}
+
+bool startTurn( sf::TcpSocket& server )
+{
+  sf::Packet packet;
+  packet << NET_MESSAGE_STARTING_TURN;
+  return packet && server.send( packet ) == sf::Socket::Done;
+}
+
+bool sendGoodbyes( sf::TcpSocket& server )
+{
+  sf::Packet packet;
+  packet << NET_MESSAGE_BYE;
+  return packet && server.send( packet ) == sf::Socket::Done;
+}
+
+bool sendTurn( sf::TcpSocket& server, const Bitmap& bitmap )
+{
+  sf::Packet packet;
+  packet << NET_MESSAGE_TURN_DONE << bitmap;
+  return packet && server.send( packet ) == sf::Socket::Done;
+}
+
+bool connect( int argc, char** argv, sf::TcpSocket& out_socket )
 {
   std::string serverStr = "mrwonko.dyndns.org";
   if( argc > 1 )
@@ -35,6 +64,7 @@ bool setup( int argc, char** argv, sf::TcpSocket& out_socket, std::string& out_e
   {
     port = 14792;
   }
+  std::cout << "Trying to connect to " << serverStr << ":" << port << "... (Change IP/Port via command line arguments - " << argv[0] << " <ip> <port>)" << std::endl;
   sf::Socket::Status status = out_socket.connect( sf::IpAddress( serverStr ), port, sf::seconds(5.f) );
   return status == sf::Socket::Done;
 }
@@ -76,15 +106,49 @@ void drawLine( sf::Image& image, sf::Vector2i p1, sf::Vector2i p2, const sf::Col
 int main( int argc, char** argv )
 {
   // Connect to server
-  sf::TcpSocket socket;
+  sf::TcpSocket server;
+  if( !connect( argc, argv, server ) )
   {
-    std::string error;
-    if( !setup( argc, argv, socket, error ) )
-    {
-      std::cout << error << std::endl;
-      return 0;
-    }
+    std::cout << "Could not connect to server." << std::endl;
+    return 0;
   }
+  std::cout << "Connected." << std::endl;
+  if( !sayHello( server ) )
+  {
+    std::cout << "Could not send greetings." << std::endl;
+    return 0;
+  }
+  sf::Packet packet;
+  std::cout << "Awaiting server answer." << std::endl;
+  if( server.receive( packet ) != sf::Socket::Done )
+  {
+    std::cout << "Server did not answer!" << std::endl;
+    return 0;
+  }
+  std::string messageType;
+  if( !( packet >> messageType ) )
+  {
+    std::cout << "Invalid message received!" << std::endl;
+    sendGoodbyes( server );
+    return 0;
+  }
+  if( messageType == NET_MESSAGE_REJECT_CLIENT )
+  {
+    std::cout << "Server rejected us." << std::endl;
+    return 0;
+  }
+  if( messageType != NET_MESSAGE_ACCEPT_CLIENT )
+  {
+    std::cout << "Invalid message received!" << std::endl;
+    sendGoodbyes( server );
+    return 0;
+  }
+  std::cout << "Server accepted us!" << std::endl;
+  // Connected and ready, apparently.
+
+  server.setBlocking( false );
+  sf::SocketSelector selector;
+  selector.add( server );
 
   // Create Window
   sf::RenderWindow wnd(
@@ -104,7 +168,9 @@ int main( int argc, char** argv )
   tex.loadFromImage(img);
   sf::Sprite sprite(tex);
   sprite.setPosition(OFS_X, OFS_Y);
-  sf::Clock roundClock;
+  sf::Clock clock;
+  float countdown = 0.f;
+  int queuePos = -1;
 
   // I do to much Lua... local function handleWindowEvents()
   struct
@@ -171,15 +237,119 @@ int main( int argc, char** argv )
     }
   } handleWindowEvents = { wnd, gameState, tex, img, sf::Vector2i( -1, -1 ), true };
 
-  // TODO REMOVE
-  gameState = GSDrawing;
+  sf::Font font;
+  if( !font.loadFromFile( FONT_PATH ) )
+  {
+    std::cout << "Could not load Font: " << FONT_PATH << std::endl;
+    return false;
+  }
+
+  sf::Text statusText;
+  statusText.setFont( font );
+  statusText.setString( STATUS_WAIT );
+  statusText.setPosition( 0, OFS_Y + IMAGE_HEIGHT );
 
   // Main loop
   while( wnd.isOpen() )
   {
+    // Network
+
+    if( selector.isReady( server ) )
+    {
+      packet.clear();
+      if( !server.receive( packet ) )
+      {
+        std::cout << "Could not receive packet!" << std::endl;
+        return 0;
+      }
+      if( !( packet >> messageType ) )
+      {
+        std::cout << "Invalid message received!" << std::endl;
+        return 0;
+      }
+      if( messageType == NET_MESSAGE_BYE )
+      {
+        std::cout << "Server signing off." << std::endl;
+        return 0;
+      }
+      else if( messageType == NET_MESSAGE_START_TURN )
+      {
+        packet.clear();
+        packet << NET_MESSAGE_STARTING_TURN;
+        if( !server.send( packet ) )
+        {
+          std::cout << "Could not send packet!" << std::endl;
+          return 0;
+        }
+        countdown = TURN_TIME;
+        clock.restart();
+        gameState = GSDrawing;
+        statusText.setString( STATUS_DRAW );
+      }
+      else if( messageType == NET_MESSAGE_TURN_ACCEPTED )
+      {
+        std::cout << "Turn accepted!" << std::endl;
+      }
+      else if( messageType == NET_MESSAGE_TURN_OVERTIME )
+      {
+        gameState = GSAwaitingTurn;
+      }
+      else if( messageType == NET_MESSAGE_SYNC )
+      {
+        packet >> countdown;
+        Bitmap bitmap;
+        packet >> bitmap;
+        bitmap.toImage( img );
+        tex.loadFromImage( img );
+      }
+      else if( messageType == NET_MESSAGE_QUEUE_INFO )
+      {
+        packet >> queuePos;
+      }
+    }
+
+    // Local logic
+    countdown = std::max( 0.f, countdown - clock.getElapsedTime().asSeconds() );
+    clock.restart();
+
+    if( countdown == 0.f && gameState == GSDrawing )
+    {
+      // Time's up!
+      packet.clear();
+      packet << NET_MESSAGE_TURN_DONE;
+      if( !server.send( packet ) )
+      {
+        std::cout << "Could not send turn to server!" << std::endl;
+        return 0;
+      }
+      gameState = GSAwaitingTurn;
+    }
+
     handleWindowEvents();
 
     wnd.clear( backgroundColor );
+
+    {
+      std::stringstream ss;
+      ss << "Time: ";
+      ss << std::max( 0, (int)( countdown + 0.5f ) );
+      sf::Text timeText;
+      timeText.setString( ss.str() );
+      timeText.setFont( font );
+      wnd.draw( timeText );
+    }
+    {
+      std::stringstream ss;
+      ss << "Queue: ";
+      ss << queuePos;
+      sf::Text queueText;
+      queueText.setString( ss.str() );
+      queueText.setPosition( WINDOW_WIDTH / 2 , 0 );
+      queueText.setFont( font );
+      wnd.draw( queueText );
+    }
+    wnd.draw( statusText );
+
     wnd.draw( sprite );
     wnd.display();
   }
