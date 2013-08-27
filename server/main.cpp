@@ -142,7 +142,7 @@ int main(int argc, char** argv)
 
   while( !g_exit )
   {
-    std::cout << "Server loop entry!" << std::endl;
+    std::cout << "Server loop entry! State: " << (state == SAwaitingClients ? "Awaiting Clients" : ( state == SAwaitingResults ? "Awaiting Results" : "Awaiting Turn Start Confirmation" ) ) << std::endl;
 
     float waitTime = 1.f; // How long to listen on sockets each tick - too long makes the server unresponsive (to SIGINT)
 
@@ -168,6 +168,7 @@ int main(int argc, char** argv)
       {
         sf::TcpSocket &client = *playingClients.front();
         state = SAwaitingTurnStartConfirmation;
+        turnTime.restart();
         if( !startTurn( client ) )
         {
           client.disconnect();
@@ -201,6 +202,17 @@ int main(int argc, char** argv)
       waitTime = std::min( timeToHandIn, waitTime );
     }
 
+    // This is a hackish way of making sure there are no dead sockets in the selector. FIXME: It works. (That means I'm missing a remove() somewhere.)
+    selector.clear();
+    selector.add( listener );
+    for( std::list< sf::TcpSocket* >::iterator it = newClients.begin(); it != newClients.end(); ++it )
+    {
+      selector.add( **it );
+    }
+    for( std::list< sf::TcpSocket* >::iterator it = playingClients.begin(); it != playingClients.end(); ++it )
+    {
+      selector.add( **it );
+    }
 
     if( selector.wait( sf::seconds( waitTime ) ) )
     {
@@ -307,6 +319,7 @@ int main(int argc, char** argv)
                         {
                           std::cout << "Putting new client into list of players." << std::endl;
                           state = SAwaitingTurnStartConfirmation;
+                          turnTime.restart();
                           playingClients.push_back( &client );
                           modifiedPlayers = true;
                         }
@@ -389,6 +402,7 @@ int main(int argc, char** argv)
                 {
                   // Player is aware he's supposed to do stuff.
                   state = SAwaitingTurnStartConfirmation;
+                  turnTime.restart();
                   break;
                 }
               }
@@ -430,6 +444,7 @@ int main(int argc, char** argv)
               // OK, what've we got?
               if( messageType == NET_MESSAGE_BYE )
               {
+                std::cout << "Client " << client.getRemoteAddress().toString() << ":" << client.getRemotePort() << " signing off." << std::endl;
                 dropClient();
               }
               else if( messageType == NET_MESSAGE_STARTING_TURN )
@@ -468,6 +483,7 @@ int main(int argc, char** argv)
                       if( !startTurn( client ) )
                       {
                         // Couldn't send "start" message, probably disconnected or something.
+                        std::cout << "Couldn't tell next player in Queue to start his turn." << std::endl;
                         client.disconnect();
                         std::cout << "Disconnecting (5) " << client.getRemoteAddress().toString() << ":" << client.getRemotePort() << std::endl;
                         selector.remove( client );
@@ -477,7 +493,9 @@ int main(int argc, char** argv)
                       else
                       {
                         // Player is aware he's supposed to do stuff.
+                        std::cout << "Next player's turn! Player " << client.getRemoteAddress().toString() << ":" << client.getRemotePort() << ", please confirm!" << std::endl;
                         state = SAwaitingTurnStartConfirmation;
+                        turnTime.restart();
                         break;
                       }
                     }
@@ -486,6 +504,8 @@ int main(int argc, char** argv)
                       assert( playingClients.empty() );
                       state = SAwaitingClients;
                     }
+                    // Same problem as above: Pushing the player back makes him get queried twice on the selector, leading to false positives.
+                    break;
                   }
                 }
               }

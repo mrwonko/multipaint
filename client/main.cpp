@@ -21,29 +21,45 @@ enum GameState
 bool sayHello( sf::TcpSocket& server )
 {
   sf::Packet packet;
+  bool blocking = server.isBlocking();
+  if( !blocking ) server.setBlocking( true );
   packet << NET_MESSAGE_HELLO << NET_VERSION;
-  return packet && server.send( packet ) == sf::Socket::Done;
+  bool success = packet && server.send( packet ) == sf::Socket::Done;
+  if( !blocking ) server.setBlocking( false );
+  return success;
 }
 
 bool startTurn( sf::TcpSocket& server )
 {
   sf::Packet packet;
+  bool blocking = server.isBlocking();
+  if( !blocking ) server.setBlocking( true );
   packet << NET_MESSAGE_STARTING_TURN;
-  return packet && server.send( packet ) == sf::Socket::Done;
+  bool success = packet && server.send( packet ) == sf::Socket::Done;
+  if( !blocking ) server.setBlocking( false );
+  return success;
 }
 
 bool sendGoodbyes( sf::TcpSocket& server )
 {
   sf::Packet packet;
+  bool blocking = server.isBlocking();
+  if( !blocking ) server.setBlocking( true );
   packet << NET_MESSAGE_BYE;
-  return packet && server.send( packet ) == sf::Socket::Done;
+  bool success = packet && server.send( packet ) == sf::Socket::Done;
+  if( !blocking ) server.setBlocking( false );
+  return success;
 }
 
 bool sendTurn( sf::TcpSocket& server, const Bitmap& bitmap )
 {
   sf::Packet packet;
+  bool blocking = server.isBlocking();
+  if( !blocking ) server.setBlocking( true );
   packet << NET_MESSAGE_TURN_DONE << bitmap;
-  return packet && server.send( packet ) == sf::Socket::Done;
+  bool success = packet && server.send( packet ) == sf::Socket::Done;
+  if( !blocking ) server.setBlocking( false );
+  return success;
 }
 
 bool connect( int argc, char** argv, sf::TcpSocket& out_socket )
@@ -145,10 +161,7 @@ int main( int argc, char** argv )
   }
   std::cout << "Server accepted us!" << std::endl;
   // Connected and ready, apparently.
-
   server.setBlocking( false );
-  sf::SocketSelector selector;
-  selector.add( server );
 
   // Create Window
   sf::RenderWindow wnd(
@@ -253,11 +266,12 @@ int main( int argc, char** argv )
   while( wnd.isOpen() )
   {
     // Network
-
-    if( selector.isReady( server ) )
+    
+    packet.clear();
+    sf::Socket::Status status; 
+    while( (status = server.receive( packet ) ) != sf::Socket::NotReady )
     {
-      packet.clear();
-      if( !server.receive( packet ) )
+      if( status != sf::Socket::Done )
       {
         std::cout << "Could not receive packet!" << std::endl;
         return 0;
@@ -274,9 +288,8 @@ int main( int argc, char** argv )
       }
       else if( messageType == NET_MESSAGE_START_TURN )
       {
-        packet.clear();
-        packet << NET_MESSAGE_STARTING_TURN;
-        if( !server.send( packet ) )
+        std::cout << "Our turn!" << std::endl;
+        if( !startTurn( server ) )
         {
           std::cout << "Could not send packet!" << std::endl;
           return 0;
@@ -292,10 +305,12 @@ int main( int argc, char** argv )
       }
       else if( messageType == NET_MESSAGE_TURN_OVERTIME )
       {
+        std::cout << "We were too slow to respond. Monster ping?" << std::endl;
         gameState = GSAwaitingTurn;
       }
       else if( messageType == NET_MESSAGE_SYNC )
       {
+        std::cout << "Sync..." << std::endl;
         packet >> countdown;
         Bitmap bitmap;
         packet >> bitmap;
@@ -315,9 +330,9 @@ int main( int argc, char** argv )
     if( countdown == 0.f && gameState == GSDrawing )
     {
       // Time's up!
-      packet.clear();
-      packet << NET_MESSAGE_TURN_DONE;
-      if( !server.send( packet ) )
+      Bitmap bitmap;
+      bitmap.fromImage( img );
+      if( !sendTurn( server, bitmap ) )
       {
         std::cout << "Could not send turn to server!" << std::endl;
         return 0;
