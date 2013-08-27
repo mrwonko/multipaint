@@ -98,6 +98,17 @@ const bool sendGoodbyes( sf::TcpSocket& client )
   return packet && client.send( packet ) == sf::Socket::Done;
 }
 
+void sendQueuePosition( std::list< sf::TcpSocket* >& clients )
+{
+  sf::Uint32 queuePosition = 0;
+  for( std::list< sf::TcpSocket* >::iterator it = clients.begin(); it != clients.end(); ++it, ++queuePosition )
+  {
+    sf::Packet packet;
+    packet << NET_MESSAGE_QUEUE_INFO << queuePosition;
+    (**it).send( packet );
+  }
+}
+
 int main(int argc, char** argv)
 {
   unsigned short port;
@@ -179,6 +190,7 @@ int main(int argc, char** argv)
         }
         else
         {
+          sendQueuePosition( playingClients );
           break;
         }
       }
@@ -351,6 +363,7 @@ int main(int argc, char** argv)
       // I suppose this could lead to duplicate receive()? That would explain the hangs until I disconnect, thus causing a "BYE".
       if( modifiedPlayers )
       {
+        sendQueuePosition( playingClients );
         std::cout << "Postponing player check since a new one was added." << std::endl;
         continue;
       }
@@ -411,6 +424,10 @@ int main(int argc, char** argv)
             if( clients.empty() )
             {
               state = SAwaitingClients;
+            }
+            else
+            {
+              sendQueuePosition( clients );
             }
 
             erased = true;

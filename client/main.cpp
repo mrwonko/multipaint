@@ -183,7 +183,7 @@ int main( int argc, char** argv )
   sprite.setPosition(OFS_X, OFS_Y);
   sf::Clock clock;
   float countdown = 0.f;
-  int queuePos = -1;
+  sf::Int32 queuePos = -1;
   bool useWhite = true;
 
   // I do to much Lua... local function handleWindowEvents()
