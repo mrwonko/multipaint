@@ -184,6 +184,7 @@ int main( int argc, char** argv )
   sf::Clock clock;
   float countdown = 0.f;
   int queuePos = -1;
+  bool useWhite = true;
 
   // I do to much Lua... local function handleWindowEvents()
   struct
@@ -194,7 +195,7 @@ int main( int argc, char** argv )
     sf::Image &img;
 
     sf::Vector2i lastMousePos;
-    bool useWhite;
+    bool& useWhite;
 
     void operator()()
     {
@@ -248,7 +249,7 @@ int main( int argc, char** argv )
         tex.loadFromImage( img );
       }
     }
-  } handleWindowEvents = { wnd, gameState, tex, img, sf::Vector2i( -1, -1 ), true };
+  } handleWindowEvents = { wnd, gameState, tex, img, sf::Vector2i( -1, -1 ), useWhite };
 
   sf::Font font;
   if( !font.loadFromFile( FONT_PATH ) )
@@ -261,6 +262,16 @@ int main( int argc, char** argv )
   statusText.setFont( font );
   statusText.setString( STATUS_WAIT );
   statusText.setPosition( 0, OFS_Y + IMAGE_HEIGHT );
+
+  sf::Text colorText;
+  colorText.setFont( font );
+  colorText.setString( COLOR_TEXT );
+  colorText.setPosition( WINDOW_WIDTH * 2 / 3, OFS_Y + IMAGE_HEIGHT );
+
+  sf::RectangleShape colorRect( sf::Vector2f( OFS_X / 2, OFS_X / 2 ) );
+  colorRect.setPosition( WINDOW_WIDTH * 2 / 3 + colorText.getLocalBounds().width + 8, OFS_Y  + IMAGE_HEIGHT );
+  colorRect.setOutlineColor( sf::Color( 127, 127, 127 ) );
+  colorRect.setOutlineThickness( - 2.f );
 
   // Main loop
   while( wnd.isOpen() )
@@ -360,10 +371,13 @@ int main( int argc, char** argv )
       ss << queuePos;
       sf::Text queueText;
       queueText.setString( ss.str() );
-      queueText.setPosition( WINDOW_WIDTH / 2 , 0 );
+      queueText.setPosition( WINDOW_WIDTH  / 2 , 0 );
       queueText.setFont( font );
       wnd.draw( queueText );
     }
+    wnd.draw( colorText );
+    colorRect.setFillColor( useWhite ? sf::Color::White : sf::Color::Black );
+    wnd.draw( colorRect );
     wnd.draw( statusText );
 
     wnd.draw( sprite );

@@ -12,6 +12,8 @@
 #define STATUS_WAIT "Awaiting turn..."
 #define STATUS_DRAW "Draw! You have 10 seconds!"
 
+#define COLOR_TEXT "Color:"
+
 //#define FONT_PATH "data/arial.ttf"
 #define FONT_PATH "data/Copyviol.ttf"
 
