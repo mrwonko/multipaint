@@ -190,7 +190,7 @@ const bool Bitmap::loadFromFile( const std::string& filename )
 
 const bool Bitmap::saveToFile( const std::string& filename ) const
 {
-  std::ofstream os( filename.c_str() );
+  std::ofstream os( filename.c_str(), std::ios::binary );
   os << "P4\n" << IMAGE_WIDTH << " " << IMAGE_HEIGHT << "\n";
   os.write( m_data[0], sizeof( m_data ) );
   os.close();
